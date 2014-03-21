@@ -30,7 +30,26 @@ usage() {
     echo -e "${Green}Example: ./batch_resize.sh ./input ./output '20 30 50'${Color_Off}" 1>&2; exit 1; 
 }
 
-# this if/else checks for 3 arguments. Without 3 arguments it automatically
+# Function to count number of files processed. Using a function due to subshells
+# being created with awk commands.
+processed() {
+    totalProcessed=$((totalProcessed++))
+    echo $totalProcessed
+}
+
+# Function to count total file size before processing. Using a function due to subshells
+# being created with awk commands.
+countOriginalSize() {
+    totalOriginalSize=$((totalOriginalSize+$1))
+}
+
+# Function to count total file size after processing. Using a function due to subshells
+# being created with awk commands.
+countNewSize() {
+    totalNewSize=$((totalNewSize+$1))
+}
+
+# This if/else checks for 3 arguments. Without 3 arguments it automatically
 # prints the Usage.
 if [[ $# -ne 3 ]]; then
     echo -e "\n"
@@ -38,13 +57,13 @@ if [[ $# -ne 3 ]]; then
     usage
 fi
 
-# this checks for help and if help is found it runs usage, as long as help is
+# This checks for help and if help is found it runs usage, as long as help is
 # the first parameter
 if [[ "$1" == "help" ]]; then
     usage
 fi
 
-# this checks if input is a directory or not. if not a directory prints usage.
+# This checks if input is a directory or not. if not a directory prints usage.
 if [[ ! -d "$1" ]]; then
     echo -e "${Red}Input directory is not a valid path.${Color_Off}"
     usage
@@ -52,8 +71,8 @@ else
     input="$1"
 fi
 
-# this checks for output directory. if it doesn't exist, it creates a directory
-# if the directory exists, it spits a warning and exits.
+# This checks for output directory. If it doesn't exist, it creates a directory.
+# If the directory exists, it spits a warning and exits.
 if [[ ! -d "$2" ]]; then
     echo -e "${Yellow}Directory does not exist. Creating directory.${Color_Off}"
     mkdir "$2"
@@ -62,12 +81,12 @@ else
     echo -e "${Red}Directory already exists. Exiting program.${Color_Off}" 1>&2; exit 1;
 fi
 
-# this section handles the array of ratios
+# This section handles the array of ratios.
 IFS=', ' read -a array <<< "$3"
 index="${#array[@]}"
 stuff="$3"
 
-
+# This section handles all the work.
 shopt -s nullglob
 # find $input/* -prune -type d | while read d; do
 #     find $d/* -prune -type f | while read f; do
@@ -96,8 +115,14 @@ for d in $input/*; do
 
             convert -resize ${array[i]}% $f $target
 
-            basesize=$(stat -c%s "$sourceName")
-            newsize=$(stat -c%s "$target")
+            basesize=`wc -c $sourceName | awk '{print $1;}'`
+            newsize=`wc -c $target | awk '{print $1;}'`
+            echo -e "Hitting processed"
+            processed
+            countOriginalSize basesize
+            countNewSize newsize
+            # basesize=$(stat -c%s "$sourceName")
+            # newsize=$(stat -c%s "$target")
 
             echo -e "${Cyan}Original image:                       ${base}.${Color_Off}"
             echo -e "${Cyan}Original image size:                  ${basesize}.${Color_Off}"
