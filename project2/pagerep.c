@@ -223,13 +223,11 @@ int main(void)
         {
             FLUSH_STDIN(input_string);
             lru(fr);
-            run = 0;
         }
         else if (input_string[0] == '2')
         {
             FLUSH_STDIN(input_string);
             clock_replace(fr);
-            run = 0;
         }
         else if (input_string[0] == '3')
         {
