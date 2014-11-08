@@ -165,88 +165,57 @@ void clock_replace(struct Frame_Data *f)
         ref_array[i] = 0;
     }
 
-    int idx2 = 0;
     int idx = 0;
 
     for (page = 0; page < STACK_MAX; page++)
     {
-        printf("CLK: %d\n", clock_hand);
         idx = find_index(clock_array, f->number_frames, f->fframe[page]);
         ++f->page_accesses;
 
-        while (idx == -1)
+        if (idx == -1)
         {
-            if (clock_hand == f->number_frames) clock_hand = 0;
-            if (ref_array[clock_hand] == 0)
+            while (idx == -1)
             {
-                if (clock_array[clock_hand] != -1) insertArray(&evict, clock_array[clock_hand]);
-                printf("%d - %s\n", page, "0 miss");
-                ref_array[clock_hand] = 1;
-                clock_array[clock_hand] = f->fframe[page];
-                clock_hand++;
-                ++f->page_misses;
-                idx = 0;
-            }
+                if (clock_hand == f->number_frames) clock_hand = 0;
+                if (ref_array[clock_hand] == 0)
+                {
+                    if (clock_array[clock_hand] != -1) insertArray(&evict, clock_array[clock_hand]);
+                    ref_array[clock_hand] = 1;
+                    clock_array[clock_hand] = f->fframe[page];
+                    clock_hand++;
+                    ++f->page_misses;
+                    idx = 0;
+                }
 
-            else if (ref_array[clock_hand] == 1)
-            {
-                ref_array[clock_hand] = 0;
-                clock_hand++;
-            }
+                else if (ref_array[clock_hand] == 1)
+                {
+                    ref_array[clock_hand] = 0;
+                    clock_hand++;
+                }
 
-            else
-            {
-                printf("%d\n", page);
-                printf("Mistake here.\n");
-            }
+                else
+                {
+                    // printf("Mistake here.\n");
+                }
 
+            }
         }
 
-        if (idx != -1 && ref_array[idx] == 0)
+        else if (idx != -1 && ref_array[idx] == 0)
         {
-            printf("%d - %s\n", page, "hit");
             ref_array[idx] = 1;
             ++f->page_hits;
         }
 
         else if (idx != -1 && ref_array[idx] == 1)
         {
-            printf("%d - %s\n", page, "hit");
             ++f->page_hits;
         }
 
         else
         {
-            printf("IDX != -1 and nothing happened.");
+            // printf("IDX != -1 and nothing happened so mistake.");
         }
-        // idx2 = find_index(clock_array, f->number_frames, f->fframe[page]);
-        // while (idx2 == -1)
-        // {
-        //     if (clock_hand == f->number_frames) clock_hand = 0;
-        //     if (ref_array[clock_hand] == 0)
-        //     {
-        //         ++size;
-        //         if (size > f->number_frames) insertArray(&evict, clock_array[clock_hand]);
-        //         ref_array[clock_hand] = 1;
-        //         clock_array[clock_hand] = f->fframe[page];
-        //         clock_hand++;
-        //         ++f->page_misses;
-        //         break;
-        //     }
-        //     else
-        //     {
-        //         ref_array[clock_hand] = 0;
-        //     }
-        //     if (clock_hand < f->number_frames) clock_hand++;
-        //     else clock_hand = 0;
-        //     if (clock_hand == f->number_frames) ref_array[clock_hand] = 1;
-
-        // }
-        // if (idx2 != -1)
-        // {
-        //     ++f->page_hits;
-        //     ref_array[idx2] = 1;
-        // }
     }
 
     print_data(f->page_accesses, f->page_hits, f->page_misses, evict);
