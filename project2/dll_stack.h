@@ -124,7 +124,7 @@ int search(int x)
 
     if (temp2 == NULL)
     {
-        return;
+        return -1;
     }
 
     while (temp2 != NULL)
@@ -170,7 +170,7 @@ int value(int x)
 
     if (temp1 == NULL)
     {
-        return;
+        return -1;
     }
 
     while (counter != x)

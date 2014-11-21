@@ -2,10 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <search.h>
+#include <limits.h>
 #include "flex_array.h"
 #include "dll_stack.h"
 
 #define STACK_MAX 28
+
+typedef enum boolean { BFALSE, BTRUE } bool_t;
 
 struct Frame_Data
 {
@@ -16,15 +19,29 @@ struct Frame_Data
     int page_misses;
 };
 
-char input_string[2];
+static bool_t get_int ( int *ival )
+{
+    char buff[25];
+    long lval;
+    char *end;
 
-#define FLUSH_STDIN(x) {if(x[strlen(x)-1]!='\n'){do fgets(input_string,16,stdin);while(input_string[strlen(input_string)-1]!='\n');}else x[strlen(x)-1]='\0';}
+    if ( fgets ( buff, sizeof buff, stdin ) == NULL )
+        return BFALSE;
+
+    lval = strtol ( buff, &end, 10 );
+
+    if ( lval < INT_MIN || INT_MAX < lval || end == buff )
+        return BFALSE;
+
+    *ival = (int)lval;
+
+    return BTRUE;
+}
 
 int find_index(int a[], int num, int x)
 {
-    int i = 0;
-
-    for (i; i < num; i++)
+    int i;
+    for (i = 0; i < num; i++)
     {
         if (a[i] == x)
         {
@@ -34,10 +51,49 @@ int find_index(int a[], int num, int x)
     return -1;
 }
 
+void print_data(int a, int h, int m, Array evict)
+{
+    int i;
+
+    printf("Number of page accesses: %d\n", a);
+    printf("Number of page hits: %d\n", h);
+    printf("Number of page misses: %d\n", m);
+
+    if (evict.used != 1)
+    {
+        printf("Evicted pages: [");
+        for (i = 1; i < evict.used; i++)
+        {
+            if (i != evict.used - 1)
+            {
+                printf("%d, ", evict.array[i]);
+            }
+            else
+            {
+                printf("%d]\n", evict.array[i]);
+            }
+        }
+    }
+    else
+    {
+        printf("%s\n", "No evicted pages.");
+    }
+
+    printf("\n###################################################\n");
+    printf("###################################################\n\n");
+}
+
 void lru(struct Frame_Data *f)
 {
-    printf("Enter number of frames: ");
-    scanf(" %d", &f->number_frames);
+    int val = 0;
+
+    printf("\nEnter number of frames: ");
+    if ( get_int ( &val ) != BFALSE )
+        f->number_frames = val;
+    else
+    {
+        printf("Invalid input. Restarting process.\n");
+    }
     printf("\nResults: \n");
 
     Array evict;
@@ -46,7 +102,7 @@ void lru(struct Frame_Data *f)
 
     int page = 0;
     int size = 0;
-    for (page; page < STACK_MAX; page++)
+    for (page = 0; page < STACK_MAX; page++)
     {
         ++f->page_accesses;
         if (size < f->number_frames && search(f->fframe[page]) < 1)
@@ -72,29 +128,23 @@ void lru(struct Frame_Data *f)
             push_left(f->fframe[page]);
         }
     }
-    printf("Number of page accesses: %d\n", f->page_accesses);
-    printf("Number of page hits: %d\n", f->page_hits);
-    printf("Number of page misses: %d\n", f->page_misses);
-    printf("Evicted pages: [");
-    int i;
-    for (i = 1; i < evict.used; i++)
-    {
-        if (i != evict.used - 1)
-        {
-            printf("%d, ", evict.array[i]);
-        }
-        else
-        {
-            printf("%d]\n", evict.array[i]);
-        }
-    }
+
+    print_data(f->page_accesses, f->page_hits, f->page_misses, evict);
+
     freeArray(&evict);
 }
 
 void clock_replace(struct Frame_Data *f)
 {
-    printf("Enter number of frames: ");
-    scanf(" %d", &f->number_frames);
+    int val = 0;
+
+    printf("\nEnter number of frames: ");
+    if ( get_int ( &val ) != BFALSE )
+        f->number_frames = val;
+    else
+    {
+        printf("Invalid input. Restarting process.\n");
+    }
     printf("\nResults: \n");
 
     Array evict;
@@ -109,63 +159,67 @@ void clock_replace(struct Frame_Data *f)
     int ref_array[f->number_frames];
 
     int i = 0;
-    for (i; i < f->number_frames; i++)
+    for (i = 0; i < f->number_frames; i++)
     {
         clock_array[i] = -1;
         ref_array[i] = 0;
     }
 
-    int idx2 = 0;
     int idx = 0;
 
-    for (page; page < STACK_MAX; page++)
+    for (page = 0; page < STACK_MAX; page++)
     {
+        idx = find_index(clock_array, f->number_frames, f->fframe[page]);
         ++f->page_accesses;
-        idx2 = find_index(clock_array, f->number_frames, f->fframe[page]);
-        while (idx2 == -1)
-        {
-            if (clock_hand == f->number_frames) clock_hand = 0;
-            if (ref_array[clock_hand] == 0)
-            {
-                ++size;
-                if (size > f->number_frames) insertArray(&evict, clock_array[clock_hand]);
-                ref_array[clock_hand] = 1;
-                clock_array[clock_hand] = f->fframe[page];
-                clock_hand++;
-                ++f->page_misses;
-                break;
-            }
-            else
-            {
-                ref_array[clock_hand] = 0;
-            }
-            if (clock_hand < f->number_frames) clock_hand++;
-            else clock_hand = 0;
-            if (clock_hand == f->number_frames) ref_array[clock_hand] = 1;
 
+        if (idx == -1)
+        {
+            while (idx == -1)
+            {
+                if (clock_hand == f->number_frames) clock_hand = 0;
+                if (ref_array[clock_hand] == 0)
+                {
+                    if (clock_array[clock_hand] != -1) insertArray(&evict, clock_array[clock_hand]);
+                    ref_array[clock_hand] = 1;
+                    clock_array[clock_hand] = f->fframe[page];
+                    clock_hand++;
+                    ++f->page_misses;
+                    idx = 0;
+                }
+
+                else if (ref_array[clock_hand] == 1)
+                {
+                    ref_array[clock_hand] = 0;
+                    clock_hand++;
+                }
+
+                else
+                {
+                    // printf("Mistake here.\n");
+                }
+
+            }
         }
-        if (idx2 != -1)
+
+        else if (idx != -1 && ref_array[idx] == 0)
+        {
+            ref_array[idx] = 1;
+            ++f->page_hits;
+        }
+
+        else if (idx != -1 && ref_array[idx] == 1)
         {
             ++f->page_hits;
-            ref_array[idx2] = 1;
+        }
+
+        else
+        {
+            // printf("IDX != -1 and nothing happened so mistake.");
         }
     }
 
-    printf("Number of page accesses: %d\n", f->page_accesses);
-    printf("Number of page hits: %d\n", f->page_hits);
-    printf("Number of page misses: %d\n", f->page_misses);
-    printf("Evicted pages: [");
-    for (i = 1; i < evict.used; i++)
-    {
-        if (i != evict.used - 1)
-        {
-            printf("%d, ", evict.array[i]);
-        }
-        else
-        {
-            printf("%d]\n", evict.array[i]);
-        }
-    }
+    print_data(f->page_accesses, f->page_hits, f->page_misses, evict);
+
     freeArray(&evict);
 }
 
@@ -173,72 +227,55 @@ int main(void)
 {
     int run = 1;
 
-    int ch;
-
-    stack = NULL;
-    temp = temp1 = NULL;
-
-    struct Frame_Data frame =
-    {
-        {
-            0, 1, 2, 3,
-            2, 4, 5, 3,
-            4, 1, 6, 3,
-            7, 8, 7, 8,
-            4, 9, 7, 8,
-            1, 2, 9, 5,
-            4, 5, 0, 2
-        }, 0, 0, 0, 0
-    };
-    struct Frame_Data *fr = &frame;
+    int val;
 
     while (run == 1)
     {
+        stack = NULL;
+        temp = temp1 = NULL;
+
+        struct Frame_Data frame =
+        {
+            {
+                0, 1, 2, 3,
+                2, 4, 5, 3,
+                4, 1, 6, 3,
+                7, 8, 7, 8,
+                4, 9, 7, 8,
+                1, 2, 9, 5,
+                4, 5, 0, 2
+            }, 0, 0, 0, 0
+        };
+        struct Frame_Data *fr = &frame;
+
         printf("####################\n");
         printf("# Make a selection #\n");
         printf("####################\n\n");
-        printf("NOTE: Only looking for single digits.\n");
-        printf("      If more than 1 is entered, the\n");
-        printf("      first digit is used.\n\n");
         printf("1 -- Least-Recently-Used (LRU)\n");
         printf("2 -- CLOCK Algorithm\n");
         printf("3 -- Quit\n\n");
 
-        fgets(input_string, sizeof(input_string), stdin);
-        int valid = 1;
-        int i;
-        for (i = 0; i < strlen(input_string); ++i)
-        {
-            if (!isdigit(input_string[i]))
+        if ( get_int ( &val ) != BFALSE )
+            if (val == 1)
             {
-                valid = 0;
-                FLUSH_STDIN(input_string);
-                break;
+                lru(fr);
             }
-        }
-
-        printf("\n");
-
-        if (input_string[0] == '1')
-        {
-            FLUSH_STDIN(input_string);
-            lru(fr);
-        }
-        else if (input_string[0] == '2')
-        {
-            FLUSH_STDIN(input_string);
-            clock_replace(fr);
-        }
-        else if (input_string[0] == '3')
-        {
-            FLUSH_STDIN(input_string);
-            printf("GOOD BYE\n");
-            run = 0;
-        }
+            else if (val == 2)
+            {
+                clock_replace(fr);
+            }
+            else if (val == 3)
+            {
+                printf("GOOD BYE\n");
+                run = 0;
+            }
+            else
+            {
+                printf("\nInvalid decision. Choose again.\n\n");
+            }
         else
         {
-            FLUSH_STDIN(input_string);
-            printf("Invalid decision. Choose again.\n\n");
+            printf("\nInvalid decision. Choose again.\n\n");
         }
     }
 
